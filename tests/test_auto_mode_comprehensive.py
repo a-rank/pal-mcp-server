@@ -94,7 +94,7 @@ class TestAutoModeComprehensive:
                     "OPENROUTER_API_KEY": None,
                 },
                 {
-                    "EXTENDED_REASONING": "gpt-5.1-codex",  # GPT-5.1 Codex prioritized for coding tasks
+                    "EXTENDED_REASONING": "gpt-5.2-codex",  # GPT-5.2 Codex prioritized for coding tasks
                     "FAST_RESPONSE": "gpt-5.2",  # Prefer gpt-5.2 for speed
                     "BALANCED": "gpt-5.2",  # Prefer gpt-5.2 for balanced
                 },

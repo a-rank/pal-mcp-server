@@ -53,6 +53,7 @@ class TestOpenAIProvider:
         assert provider.validate_model_name("gpt-5.2") is True
         assert provider.validate_model_name("gpt-5.1-codex") is True
         assert provider.validate_model_name("gpt-5.1-codex-mini") is True
+        assert provider.validate_model_name("gpt-5.2-codex") is True
 
         # Test valid aliases
         assert provider.validate_model_name("mini") is True
@@ -65,6 +66,7 @@ class TestOpenAIProvider:
         assert provider.validate_model_name("gpt5.2") is True
         assert provider.validate_model_name("gpt5.1") is True
         assert provider.validate_model_name("gpt5.1-codex") is True
+        assert provider.validate_model_name("codex") is True
         assert provider.validate_model_name("codex-mini") is True
 
         # Test invalid model
@@ -87,6 +89,7 @@ class TestOpenAIProvider:
         assert provider._resolve_model_name("gpt5.2") == "gpt-5.2"
         assert provider._resolve_model_name("gpt5.1") == "gpt-5.2"
         assert provider._resolve_model_name("gpt5.1-codex") == "gpt-5.1-codex"
+        assert provider._resolve_model_name("codex") == "gpt-5.2-codex"
         assert provider._resolve_model_name("codex-mini") == "gpt-5.1-codex-mini"
 
         # Test full name passthrough

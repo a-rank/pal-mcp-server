@@ -99,7 +99,7 @@ class TestModelSelection:
 
             model = ModelProviderRegistry.get_preferred_fallback_model(ToolModelCategory.EXTENDED_REASONING)
             # OpenAI prefers GPT-5.1-Codex for extended reasoning (coding tasks)
-            assert model == "gpt-5.1-codex"
+            assert model == "gpt-5.2-codex"
 
     def test_extended_reasoning_with_gemini_only(self):
         """Test EXTENDED_REASONING prefers pro when only Gemini is available."""
@@ -195,7 +195,7 @@ class TestFlexibleModelSelection:
                 "env": {"OPENAI_API_KEY": "test-key"},
                 "provider_type": ProviderType.OPENAI,
                 "category": ToolModelCategory.EXTENDED_REASONING,
-                "expected": "gpt-5.1-codex",  # GPT-5.1-Codex prioritized for coding tasks
+                "expected": "gpt-5.2-codex",  # GPT-5.2-Codex prioritized for coding tasks
             },
             # Case 2: Gemini provider for fast response
             {
