@@ -70,6 +70,8 @@ SECONDTHOUGHTS_FIELD_DESCRIPTIONS = {
     ),
     "focus_on": "Optional note on areas to emphasise (e.g. 'threading', 'auth flow', 'migration risk', 'scalability').",
     "severity_filter": "Lowest severity to include when reporting issues (critical/high/medium/low/all).",
+    "openai_model": "Override the default OpenAI model (e.g. 'o3', 'gpt-4.1'). Defaults to gpt-5.2-codex.",
+    "gemini_model": "Override the default Gemini model (e.g. 'gemini-2.5-pro'). Defaults to gemini-3.1-pro-preview.",
 }
 
 
@@ -111,6 +113,10 @@ class SecondThoughtsRequest(WorkflowRequest):
     severity_filter: Literal["critical", "high", "medium", "low", "all"] | None = Field(
         "all", description=SECONDTHOUGHTS_FIELD_DESCRIPTIONS["severity_filter"]
     )
+
+    # Optional model overrides
+    openai_model: str | None = Field(None, description=SECONDTHOUGHTS_FIELD_DESCRIPTIONS["openai_model"])
+    gemini_model: str | None = Field(None, description=SECONDTHOUGHTS_FIELD_DESCRIPTIONS["gemini_model"])
 
     # Override inherited fields to exclude from schema
     temperature: float | None = Field(default=None, exclude=True)
@@ -248,6 +254,14 @@ class SecondThoughtsTool(WorkflowTool):
                 "enum": ["critical", "high", "medium", "low", "all"],
                 "default": "all",
                 "description": SECONDTHOUGHTS_FIELD_DESCRIPTIONS["severity_filter"],
+            },
+            "openai_model": {
+                "type": "string",
+                "description": SECONDTHOUGHTS_FIELD_DESCRIPTIONS["openai_model"],
+            },
+            "gemini_model": {
+                "type": "string",
+                "description": SECONDTHOUGHTS_FIELD_DESCRIPTIONS["gemini_model"],
             },
         }
 
@@ -504,13 +518,23 @@ class SecondThoughtsTool(WorkflowTool):
 
         return "\n".join(summary_parts)
 
+    # Locked models for each provider — always use latest flagship reasoning models
+    LOCKED_MODELS = {
+        "openai": "gpt-5.2-codex",
+        "google": "gemini-3.1-pro-preview",
+    }
+
     async def _call_both_providers(self, review_prompt: str, request) -> list[dict]:
         """Call both OpenAI and Gemini in parallel for independent code review."""
         from providers.registry import ModelProviderRegistry
         from providers.shared.provider_type import ProviderType
-        from tools.models import ToolModelCategory
 
-        # Resolve best model for each provider
+        # Per-provider override from request, keyed by ProviderType value
+        model_overrides = {
+            "openai": getattr(request, "openai_model", None),
+            "google": getattr(request, "gemini_model", None),
+        }
+
         provider_configs = []
 
         for provider_type in [ProviderType.OPENAI, ProviderType.GOOGLE]:
@@ -519,21 +543,20 @@ class SecondThoughtsTool(WorkflowTool):
                 logger.info(f"[SECONDTHOUGHTS] Provider {provider_type.value} not available, skipping")
                 continue
 
-            # Get provider's preferred model for code review
-            allowed_models = ModelProviderRegistry._get_allowed_models_for_provider(provider, provider_type)
-            if not allowed_models:
-                logger.info(f"[SECONDTHOUGHTS] No allowed models for {provider_type.value}, skipping")
+            # Use explicit override if provided, otherwise fall back to locked default
+            model_name = model_overrides.get(provider_type.value) or self.LOCKED_MODELS.get(provider_type.value)
+            if not model_name:
+                logger.info(f"[SECONDTHOUGHTS] No model resolved for {provider_type.value}, skipping")
                 continue
 
-            preferred_model = provider.get_preferred_model(ToolModelCategory.EXTENDED_REASONING, list(allowed_models))
-            if not preferred_model:
-                preferred_model = sorted(allowed_models)[0]
+            if model_overrides.get(provider_type.value):
+                logger.info(f"[SECONDTHOUGHTS] Using user override model for {provider_type.value}: {model_name}")
 
             provider_configs.append(
                 {
                     "provider": provider,
                     "provider_type": provider_type,
-                    "model_name": preferred_model,
+                    "model_name": model_name,
                 }
             )
 
