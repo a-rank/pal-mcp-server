@@ -16,6 +16,7 @@ from .planner import PlannerTool
 from .precommit import PrecommitTool
 from .refactor import RefactorTool
 from .secaudit import SecauditTool
+from .secondthoughts import SecondThoughtsTool
 from .testgen import TestGenTool
 from .thinkdeep import ThinkDeepTool
 from .tracer import TracerTool
@@ -31,6 +32,7 @@ __all__ = [
     "ChatTool",
     "CLinkTool",
     "ConsensusTool",
+    "SecondThoughtsTool",
     "ListModelsTool",
     "PlannerTool",
     "PrecommitTool",
