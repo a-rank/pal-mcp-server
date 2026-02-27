@@ -56,13 +56,13 @@ from tools import (  # noqa: E402
     ConsensusTool,
     DebugIssueTool,
     DocgenTool,
-    DualReviewTool,
     ListModelsTool,
     LookupTool,
     PlannerTool,
     PrecommitTool,
     RefactorTool,
     SecauditTool,
+    SecondThoughtsTool,
     TestGenTool,
     ThinkDeepTool,
     TracerTool,
@@ -266,7 +266,7 @@ TOOLS = {
     "planner": PlannerTool(),  # Interactive sequential planner using workflow architecture
     "consensus": ConsensusTool(),  # Step-by-step consensus workflow with multi-model analysis
     "codereview": CodeReviewTool(),  # Comprehensive step-by-step code review workflow with expert analysis
-    "dualreview": DualReviewTool(),  # Parallel code review from both OpenAI and Gemini simultaneously
+    "secondthoughts": SecondThoughtsTool(),  # Parallel code review from both OpenAI and Gemini simultaneously
     "precommit": PrecommitTool(),  # Step-by-step pre-commit validation workflow
     "debug": DebugIssueTool(),  # Root cause analysis and debugging assistance
     "secaudit": SecauditTool(),  # Comprehensive security audit with OWASP Top 10 and compliance coverage

@@ -1,5 +1,5 @@
 """
-DualReview tool - Parallel code review from OpenAI and Gemini simultaneously
+Second Thoughts tool - Parallel code review from OpenAI and Gemini simultaneously
 
 This tool provides a structured code review workflow that automatically sends code
 to both OpenAI and Gemini providers for independent review, then presents both
@@ -29,7 +29,7 @@ if TYPE_CHECKING:
 from mcp.types import TextContent
 
 from config import TEMPERATURE_ANALYTICAL
-from systemprompts.dualreview_prompt import DUALREVIEW_PROMPT
+from systemprompts.secondthoughts_prompt import SECONDTHOUGHTS_PROMPT
 from tools.shared.base_models import ConsolidatedFindings, WorkflowRequest
 from utils.conversation_memory import MAX_CONVERSATION_TURNS, create_thread, get_thread
 
@@ -38,7 +38,7 @@ from .workflow.base import WorkflowTool
 logger = logging.getLogger(__name__)
 
 # Tool-specific field descriptions
-DUALREVIEW_FIELD_DESCRIPTIONS = {
+SECONDTHOUGHTS_FIELD_DESCRIPTIONS = {
     "step": (
         "Review narrative. Step 1: outline the review strategy and initial findings. "
         "Step 2: report deeper findings. The tool sends code to both OpenAI and Gemini "
@@ -65,44 +65,50 @@ DUALREVIEW_FIELD_DESCRIPTIONS = {
 }
 
 
-class DualReviewRequest(WorkflowRequest):
-    """Request model for dual review workflow steps"""
+class SecondThoughtsRequest(WorkflowRequest):
+    """Request model for second thoughts workflow steps"""
 
     # Required fields for each step
-    step: str = Field(..., description=DUALREVIEW_FIELD_DESCRIPTIONS["step"])
-    step_number: int = Field(..., description=DUALREVIEW_FIELD_DESCRIPTIONS["step_number"])
-    total_steps: int = Field(..., description=DUALREVIEW_FIELD_DESCRIPTIONS["total_steps"])
-    next_step_required: bool = Field(..., description=DUALREVIEW_FIELD_DESCRIPTIONS["next_step_required"])
+    step: str = Field(..., description=SECONDTHOUGHTS_FIELD_DESCRIPTIONS["step"])
+    step_number: int = Field(..., description=SECONDTHOUGHTS_FIELD_DESCRIPTIONS["step_number"])
+    total_steps: int = Field(..., description=SECONDTHOUGHTS_FIELD_DESCRIPTIONS["total_steps"])
+    next_step_required: bool = Field(..., description=SECONDTHOUGHTS_FIELD_DESCRIPTIONS["next_step_required"])
 
     # Investigation tracking fields
-    findings: str = Field(..., description=DUALREVIEW_FIELD_DESCRIPTIONS["findings"])
-    files_checked: list[str] = Field(default_factory=list, description=DUALREVIEW_FIELD_DESCRIPTIONS["files_checked"])
-    relevant_files: list[str] = Field(default_factory=list, description=DUALREVIEW_FIELD_DESCRIPTIONS["relevant_files"])
-    relevant_context: list[str] = Field(
-        default_factory=list, description=DUALREVIEW_FIELD_DESCRIPTIONS["relevant_context"]
+    findings: str = Field(..., description=SECONDTHOUGHTS_FIELD_DESCRIPTIONS["findings"])
+    files_checked: list[str] = Field(
+        default_factory=list, description=SECONDTHOUGHTS_FIELD_DESCRIPTIONS["files_checked"]
     )
-    issues_found: list[dict] = Field(default_factory=list, description=DUALREVIEW_FIELD_DESCRIPTIONS["issues_found"])
+    relevant_files: list[str] = Field(
+        default_factory=list, description=SECONDTHOUGHTS_FIELD_DESCRIPTIONS["relevant_files"]
+    )
+    relevant_context: list[str] = Field(
+        default_factory=list, description=SECONDTHOUGHTS_FIELD_DESCRIPTIONS["relevant_context"]
+    )
+    issues_found: list[dict] = Field(
+        default_factory=list, description=SECONDTHOUGHTS_FIELD_DESCRIPTIONS["issues_found"]
+    )
 
     # Deprecated confidence field kept for compatibility
     confidence: str | None = Field("low", exclude=True)
 
     # Optional images
-    images: list[str] | None = Field(default=None, description=DUALREVIEW_FIELD_DESCRIPTIONS["images"])
+    images: list[str] | None = Field(default=None, description=SECONDTHOUGHTS_FIELD_DESCRIPTIONS["images"])
 
     # Review-specific fields (used in step 1)
     review_type: Literal["full", "security", "performance", "quick"] | None = Field(
-        "full", description=DUALREVIEW_FIELD_DESCRIPTIONS["review_type"]
+        "full", description=SECONDTHOUGHTS_FIELD_DESCRIPTIONS["review_type"]
     )
-    focus_on: str | None = Field(None, description=DUALREVIEW_FIELD_DESCRIPTIONS["focus_on"])
+    focus_on: str | None = Field(None, description=SECONDTHOUGHTS_FIELD_DESCRIPTIONS["focus_on"])
     severity_filter: Literal["critical", "high", "medium", "low", "all"] | None = Field(
-        "all", description=DUALREVIEW_FIELD_DESCRIPTIONS["severity_filter"]
+        "all", description=SECONDTHOUGHTS_FIELD_DESCRIPTIONS["severity_filter"]
     )
 
     # Override inherited fields to exclude from schema
     temperature: float | None = Field(default=None, exclude=True)
     thinking_mode: str | None = Field(default=None, exclude=True)
 
-    # Not used in dualreview
+    # Not used in secondthoughts
     hypothesis: str | None = Field(None, exclude=True)
 
     @model_validator(mode="after")
@@ -113,9 +119,9 @@ class DualReviewRequest(WorkflowRequest):
         return self
 
 
-class DualReviewTool(WorkflowTool):
+class SecondThoughtsTool(WorkflowTool):
     """
-    Dual Review tool for parallel code review from OpenAI and Gemini.
+    Second Thoughts tool for parallel code review from OpenAI and Gemini.
 
     This tool implements a structured code review workflow where the CLI agent
     investigates code through systematic steps, then automatically sends the
@@ -129,118 +135,118 @@ class DualReviewTool(WorkflowTool):
         self.review_config: dict = {}
 
     def get_name(self) -> str:
-        return "dualreview"
+        return "secondthoughts"
 
     def get_description(self) -> str:
         return (
-            "Parallel code review from both OpenAI and Gemini simultaneously. "
+            "Get a second opinion — parallel code review from both OpenAI and Gemini simultaneously. "
             "Use when you want independent expert opinions from multiple AI providers "
             "without specifying models manually. Guides through structured investigation, "
             "then sends code to both providers for independent review."
         )
 
     def get_system_prompt(self) -> str:
-        return DUALREVIEW_PROMPT
+        return SECONDTHOUGHTS_PROMPT
 
     def get_default_temperature(self) -> float:
         return TEMPERATURE_ANALYTICAL
 
     def get_model_category(self) -> ToolModelCategory:
-        """Dual review requires extended reasoning."""
+        """Second thoughts requires extended reasoning."""
         from tools.models import ToolModelCategory
 
         return ToolModelCategory.EXTENDED_REASONING
 
     def get_workflow_request_model(self):
-        """Return the dual review workflow-specific request model."""
-        return DualReviewRequest
+        """Return the second thoughts workflow-specific request model."""
+        return SecondThoughtsRequest
 
     def requires_model(self) -> bool:
-        """DualReview manages its own model selection — no model needed at MCP boundary."""
+        """SecondThoughts manages its own model selection — no model needed at MCP boundary."""
         return False
 
     def requires_expert_analysis(self) -> bool:
-        """DualReview handles its own dual-model calls instead of standard expert analysis."""
+        """SecondThoughts handles its own dual-model calls instead of standard expert analysis."""
         return False
 
     def get_input_schema(self) -> dict[str, Any]:
-        """Generate input schema for dual review workflow."""
+        """Generate input schema for second thoughts workflow."""
         from .workflow.schema_builders import WorkflowSchemaBuilder
 
         field_overrides = {
             "step": {
                 "type": "string",
-                "description": DUALREVIEW_FIELD_DESCRIPTIONS["step"],
+                "description": SECONDTHOUGHTS_FIELD_DESCRIPTIONS["step"],
             },
             "step_number": {
                 "type": "integer",
                 "minimum": 1,
-                "description": DUALREVIEW_FIELD_DESCRIPTIONS["step_number"],
+                "description": SECONDTHOUGHTS_FIELD_DESCRIPTIONS["step_number"],
             },
             "total_steps": {
                 "type": "integer",
                 "minimum": 1,
-                "description": DUALREVIEW_FIELD_DESCRIPTIONS["total_steps"],
+                "description": SECONDTHOUGHTS_FIELD_DESCRIPTIONS["total_steps"],
             },
             "next_step_required": {
                 "type": "boolean",
-                "description": DUALREVIEW_FIELD_DESCRIPTIONS["next_step_required"],
+                "description": SECONDTHOUGHTS_FIELD_DESCRIPTIONS["next_step_required"],
             },
             "findings": {
                 "type": "string",
-                "description": DUALREVIEW_FIELD_DESCRIPTIONS["findings"],
+                "description": SECONDTHOUGHTS_FIELD_DESCRIPTIONS["findings"],
             },
             "files_checked": {
                 "type": "array",
                 "items": {"type": "string"},
-                "description": DUALREVIEW_FIELD_DESCRIPTIONS["files_checked"],
+                "description": SECONDTHOUGHTS_FIELD_DESCRIPTIONS["files_checked"],
             },
             "relevant_files": {
                 "type": "array",
                 "items": {"type": "string"},
-                "description": DUALREVIEW_FIELD_DESCRIPTIONS["relevant_files"],
+                "description": SECONDTHOUGHTS_FIELD_DESCRIPTIONS["relevant_files"],
             },
             "relevant_context": {
                 "type": "array",
                 "items": {"type": "string"},
-                "description": DUALREVIEW_FIELD_DESCRIPTIONS["relevant_context"],
+                "description": SECONDTHOUGHTS_FIELD_DESCRIPTIONS["relevant_context"],
             },
             "issues_found": {
                 "type": "array",
                 "items": {"type": "object"},
-                "description": DUALREVIEW_FIELD_DESCRIPTIONS["issues_found"],
+                "description": SECONDTHOUGHTS_FIELD_DESCRIPTIONS["issues_found"],
             },
             "images": {
                 "type": "array",
                 "items": {"type": "string"},
-                "description": DUALREVIEW_FIELD_DESCRIPTIONS["images"],
+                "description": SECONDTHOUGHTS_FIELD_DESCRIPTIONS["images"],
             },
             "review_type": {
                 "type": "string",
                 "enum": ["full", "security", "performance", "quick"],
                 "default": "full",
-                "description": DUALREVIEW_FIELD_DESCRIPTIONS["review_type"],
+                "description": SECONDTHOUGHTS_FIELD_DESCRIPTIONS["review_type"],
             },
             "focus_on": {
                 "type": "string",
-                "description": DUALREVIEW_FIELD_DESCRIPTIONS["focus_on"],
+                "description": SECONDTHOUGHTS_FIELD_DESCRIPTIONS["focus_on"],
             },
             "severity_filter": {
                 "type": "string",
                 "enum": ["critical", "high", "medium", "low", "all"],
                 "default": "all",
-                "description": DUALREVIEW_FIELD_DESCRIPTIONS["severity_filter"],
+                "description": SECONDTHOUGHTS_FIELD_DESCRIPTIONS["severity_filter"],
             },
         }
 
-        # Exclude fields not used in dualreview
+        # Exclude fields not used in secondthoughts
         excluded_workflow_fields = [
             "hypothesis",
             "confidence",
         ]
 
         excluded_common_fields = [
-            "model",  # DualReview picks its own models
+            "model",  # SecondThoughts picks its own models
             "temperature",
             "thinking_mode",
         ]
@@ -294,11 +300,11 @@ class DualReviewTool(WorkflowTool):
             ]
 
     def should_call_expert_analysis(self, consolidated_findings, request=None) -> bool:
-        """DualReview handles its own model calls — skip standard expert analysis."""
+        """SecondThoughts handles its own model calls — skip standard expert analysis."""
         return False
 
     def prepare_expert_analysis_context(self, consolidated_findings) -> str:
-        """Not used — dualreview builds its own prompt for each provider."""
+        """Not used — secondthoughts builds its own prompt for each provider."""
         return ""
 
     def prepare_step_data(self, request) -> dict:
@@ -383,19 +389,19 @@ class DualReviewTool(WorkflowTool):
         )
 
         return {
-            "status": "dual_review_in_progress",
+            "status": "second_thoughts_in_progress",
             "step_number": request.step_number,
             "total_steps": request.total_steps,
-            "dualreview_status": {
+            "secondthoughts_status": {
                 "steps_completed": request.step_number,
                 "files_examined": len(self.consolidated_findings.files_checked),
                 "issues_found": len(self.consolidated_findings.issues_found),
             },
             "next_steps": (
-                "MANDATORY: DO NOT call dualreview again immediately. You MUST first examine "
+                "MANDATORY: DO NOT call secondthoughts again immediately. You MUST first examine "
                 "the code files thoroughly. REQUIRED ACTIONS:\n"
                 + "\n".join(f"{i + 1}. {action}" for i, action in enumerate(required_actions))
-                + f"\n\nOnly call dualreview again AFTER completing your investigation. "
+                + f"\n\nOnly call secondthoughts again AFTER completing your investigation. "
                 f"Use step_number: {request.step_number + 1} and report specific findings."
             ),
             "metadata": {
@@ -468,13 +474,13 @@ class DualReviewTool(WorkflowTool):
         for provider_type in [ProviderType.OPENAI, ProviderType.GOOGLE]:
             provider = ModelProviderRegistry.get_provider(provider_type)
             if not provider:
-                logger.info(f"[DUALREVIEW] Provider {provider_type.value} not available, skipping")
+                logger.info(f"[SECONDTHOUGHTS] Provider {provider_type.value} not available, skipping")
                 continue
 
             # Get provider's preferred model for code review
             allowed_models = ModelProviderRegistry._get_allowed_models_for_provider(provider, provider_type)
             if not allowed_models:
-                logger.info(f"[DUALREVIEW] No allowed models for {provider_type.value}, skipping")
+                logger.info(f"[SECONDTHOUGHTS] No allowed models for {provider_type.value}, skipping")
                 continue
 
             preferred_model = provider.get_preferred_model(ToolModelCategory.EXTENDED_REASONING, list(allowed_models))
@@ -490,7 +496,7 @@ class DualReviewTool(WorkflowTool):
             )
 
         if not provider_configs:
-            logger.warning("[DUALREVIEW] No providers available for dual review")
+            logger.warning("[SECONDTHOUGHTS] No providers available for dual review")
             return [
                 {
                     "provider": "none",
@@ -508,7 +514,7 @@ class DualReviewTool(WorkflowTool):
         for i, result in enumerate(results):
             if isinstance(result, Exception):
                 config = provider_configs[i]
-                logger.exception(f"[DUALREVIEW] Error from {config['provider_type'].value}: {result}")
+                logger.exception(f"[SECONDTHOUGHTS] Error from {config['provider_type'].value}: {result}")
                 reviews.append(
                     {
                         "provider": config["provider_type"].value,
@@ -579,7 +585,7 @@ class DualReviewTool(WorkflowTool):
         failed_reviews = [r for r in reviews if r["status"] == "error"]
 
         response_data = {
-            "status": "dual_review_complete",
+            "status": "second_thoughts_complete",
             "step_number": request.step_number,
             "total_steps": request.total_steps,
             "reviews": reviews,
@@ -598,7 +604,7 @@ class DualReviewTool(WorkflowTool):
                 "issues_found_by_agent": self.consolidated_findings.issues_found,
             },
             "next_steps": (
-                "DUAL REVIEW IS COMPLETE. You MUST now:\n"
+                "SECOND THOUGHTS REVIEW IS COMPLETE. You MUST now:\n"
                 "1. Present BOTH reviews side-by-side to the user\n"
                 "2. Highlight where both reviewers AGREE (high-confidence issues)\n"
                 "3. Highlight where they DISAGREE (needs user judgment)\n"
@@ -610,7 +616,7 @@ class DualReviewTool(WorkflowTool):
                 "tool_name": self.get_name(),
                 "workflow_type": "dual_provider_review",
                 "models_consulted": [r.get("model", "unknown") for r in reviews],
-                "dual_review_complete": True,
+                "second_thoughts_complete": True,
             },
         }
 
@@ -628,9 +634,9 @@ class DualReviewTool(WorkflowTool):
                 remaining_turns = MAX_CONVERSATION_TURNS - 1
 
             note = (
-                f"Dual review workflow can continue for {remaining_turns} more exchanges."
+                f"Second thoughts workflow can continue for {remaining_turns} more exchanges."
                 if remaining_turns > 0
-                else "Dual review workflow continuation limit reached."
+                else "Second thoughts workflow continuation limit reached."
             )
 
             return ContinuationOffer(
@@ -657,8 +663,8 @@ class DualReviewTool(WorkflowTool):
     # Required abstract methods from BaseTool
 
     def get_request_model(self):
-        """Return the dual review workflow-specific request model."""
-        return DualReviewRequest
+        """Return the second thoughts workflow-specific request model."""
+        return SecondThoughtsRequest
 
     async def prepare_prompt(self, request) -> str:
         """Not used — workflow tools use execute_workflow()."""

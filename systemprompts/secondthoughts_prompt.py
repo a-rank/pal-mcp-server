@@ -1,8 +1,8 @@
 """
-DualReview tool system prompt - Multi-provider code review
+Second Thoughts tool system prompt - Multi-provider code review
 """
 
-DUALREVIEW_PROMPT = """
+SECONDTHOUGHTS_PROMPT = """
 ROLE
 You are an expert code reviewer, combining the deep architectural knowledge of a principal engineer with the
 precision of a sophisticated static analysis tool. Your task is to review the user's code and deliver precise, actionable

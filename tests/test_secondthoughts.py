@@ -1,23 +1,23 @@
 """
-Tests for the DualReview tool.
+Tests for the Second Thoughts tool.
 """
 
 from unittest.mock import Mock, patch
 
 import pytest
 
-from tools.dualreview import DualReviewRequest, DualReviewTool
 from tools.models import ToolModelCategory
+from tools.secondthoughts import SecondThoughtsRequest, SecondThoughtsTool
 
 
-class TestDualReviewTool:
-    """Test suite for DualReviewTool."""
+class TestSecondThoughtsTool:
+    """Test suite for SecondThoughtsTool."""
 
     def test_tool_metadata(self):
         """Test basic tool metadata and configuration."""
-        tool = DualReviewTool()
+        tool = SecondThoughtsTool()
 
-        assert tool.get_name() == "dualreview"
+        assert tool.get_name() == "secondthoughts"
         assert "OpenAI" in tool.get_description()
         assert "Gemini" in tool.get_description()
         assert tool.get_default_temperature() == 1.0  # TEMPERATURE_ANALYTICAL
@@ -27,7 +27,7 @@ class TestDualReviewTool:
 
     def test_request_validation_step1(self):
         """Test Pydantic request model validation for step 1."""
-        request = DualReviewRequest(
+        request = SecondThoughtsRequest(
             step="Reviewing authentication module for security issues",
             step_number=1,
             total_steps=2,
@@ -44,7 +44,7 @@ class TestDualReviewTool:
     def test_request_validation_missing_files_step1(self):
         """Test that step 1 requires relevant_files field."""
         with pytest.raises(ValueError, match="Step 1 requires 'relevant_files'"):
-            DualReviewRequest(
+            SecondThoughtsRequest(
                 step="Test step",
                 step_number=1,
                 total_steps=2,
@@ -55,7 +55,7 @@ class TestDualReviewTool:
 
     def test_request_validation_later_steps(self):
         """Test request validation for steps 2+."""
-        request = DualReviewRequest(
+        request = SecondThoughtsRequest(
             step="Deeper analysis of security concerns",
             step_number=2,
             total_steps=2,
@@ -69,7 +69,7 @@ class TestDualReviewTool:
 
     def test_request_with_review_options(self):
         """Test request with all review-specific options."""
-        request = DualReviewRequest(
+        request = SecondThoughtsRequest(
             step="Security-focused review",
             step_number=1,
             total_steps=2,
@@ -87,7 +87,7 @@ class TestDualReviewTool:
 
     def test_input_schema_generation(self):
         """Test that input schema is generated correctly."""
-        tool = DualReviewTool()
+        tool = SecondThoughtsTool()
         schema = tool.get_input_schema()
 
         # Core workflow fields should be present
@@ -116,7 +116,7 @@ class TestDualReviewTool:
 
     def test_get_required_actions_step1(self):
         """Test required actions for step 1."""
-        tool = DualReviewTool()
+        tool = SecondThoughtsTool()
 
         actions = tool.get_required_actions(1, "low", "", 2)
         assert len(actions) >= 3
@@ -125,7 +125,7 @@ class TestDualReviewTool:
 
     def test_get_required_actions_step2(self):
         """Test required actions for step 2."""
-        tool = DualReviewTool()
+        tool = SecondThoughtsTool()
 
         actions = tool.get_required_actions(2, "medium", "Found issues", 2)
         assert len(actions) >= 3
@@ -134,7 +134,7 @@ class TestDualReviewTool:
 
     def test_get_required_actions_continuation(self):
         """Test required actions for continuation workflows."""
-        tool = DualReviewTool()
+        tool = SecondThoughtsTool()
         mock_request = Mock()
         mock_request.continuation_id = "test-cont-id"
 
@@ -145,8 +145,8 @@ class TestDualReviewTool:
 
     def test_prepare_step_data(self):
         """Test step data preparation."""
-        tool = DualReviewTool()
-        request = DualReviewRequest(
+        tool = SecondThoughtsTool()
+        request = SecondThoughtsRequest(
             step="Test step",
             step_number=1,
             total_steps=2,
@@ -168,14 +168,14 @@ class TestDualReviewTool:
         assert len(step_data["issues_found"]) == 1
 
     def test_should_call_expert_analysis(self):
-        """Test that dualreview skips standard expert analysis."""
-        tool = DualReviewTool()
+        """Test that secondthoughts skips standard expert analysis."""
+        tool = SecondThoughtsTool()
         assert tool.should_call_expert_analysis({}) is False
         assert tool.requires_expert_analysis() is False
 
     def test_build_review_prompt(self):
         """Test review prompt construction."""
-        tool = DualReviewTool()
+        tool = SecondThoughtsTool()
         tool.initial_request = "Review the authentication module"
         tool.consolidated_findings = Mock()
         tool.consolidated_findings.findings = ["Step 1: Found auth issues"]
@@ -200,7 +200,7 @@ class TestDualReviewTool:
 
     def test_build_investigation_summary(self):
         """Test investigation summary construction."""
-        tool = DualReviewTool()
+        tool = SecondThoughtsTool()
         tool.consolidated_findings = Mock()
         tool.consolidated_findings.findings = [
             "Step 1: Reviewed auth module",
@@ -219,7 +219,7 @@ class TestDualReviewTool:
 
     def test_build_final_response(self):
         """Test final response structure."""
-        tool = DualReviewTool()
+        tool = SecondThoughtsTool()
         tool.initial_request = "Review code"
         tool.consolidated_findings = Mock()
         tool.consolidated_findings.findings = ["Step 1: findings"]
@@ -238,17 +238,17 @@ class TestDualReviewTool:
 
         response = tool._build_final_response(request, reviews)
 
-        assert response["status"] == "dual_review_complete"
+        assert response["status"] == "second_thoughts_complete"
         assert len(response["reviews"]) == 2
         assert response["summary"]["successful_reviews"] == 2
         assert response["summary"]["failed_reviews"] == 0
         assert "openai" in response["summary"]["providers"]
         assert "google" in response["summary"]["providers"]
-        assert response["metadata"]["dual_review_complete"] is True
+        assert response["metadata"]["second_thoughts_complete"] is True
 
     def test_build_final_response_partial_failure(self):
         """Test final response when one provider fails."""
-        tool = DualReviewTool()
+        tool = SecondThoughtsTool()
         tool.initial_request = "Review code"
         tool.consolidated_findings = Mock()
         tool.consolidated_findings.findings = []
@@ -272,12 +272,12 @@ class TestDualReviewTool:
 
     def test_build_continuation_response(self):
         """Test intermediate step response."""
-        tool = DualReviewTool()
+        tool = SecondThoughtsTool()
         tool.consolidated_findings = Mock()
         tool.consolidated_findings.files_checked = {"/a.py", "/b.py"}
         tool.consolidated_findings.issues_found = [{"severity": "high"}]
 
-        request = DualReviewRequest(
+        request = SecondThoughtsRequest(
             step="Step 1 analysis",
             step_number=1,
             total_steps=2,
@@ -288,16 +288,16 @@ class TestDualReviewTool:
 
         response = tool._build_continuation_response(request)
 
-        assert response["status"] == "dual_review_in_progress"
+        assert response["status"] == "second_thoughts_in_progress"
         assert response["step_number"] == 1
-        assert response["dualreview_status"]["files_examined"] == 2
-        assert response["dualreview_status"]["issues_found"] == 1
+        assert response["secondthoughts_status"]["files_examined"] == 2
+        assert response["secondthoughts_status"]["issues_found"] == 1
         assert "MANDATORY" in response["next_steps"]
 
     @pytest.mark.asyncio
     async def test_call_both_providers_no_providers(self):
         """Test graceful handling when no providers are available."""
-        tool = DualReviewTool()
+        tool = SecondThoughtsTool()
 
         with patch("providers.registry.ModelProviderRegistry.get_provider", return_value=None):
 
@@ -316,7 +316,7 @@ class TestDualReviewTool:
         """Test calling a single provider."""
         from providers.shared.provider_type import ProviderType
 
-        tool = DualReviewTool()
+        tool = SecondThoughtsTool()
 
         mock_provider = Mock()
         mock_response = Mock()
@@ -347,7 +347,7 @@ class TestDualReviewTool:
         """Test that file content is included in provider call."""
         from providers.shared.provider_type import ProviderType
 
-        tool = DualReviewTool()
+        tool = SecondThoughtsTool()
 
         mock_provider = Mock()
         mock_response = Mock()
@@ -376,17 +376,17 @@ class TestDualReviewTool:
 
     def test_store_initial_issue(self):
         """Test initial issue storage."""
-        tool = DualReviewTool()
+        tool = SecondThoughtsTool()
         tool.store_initial_issue("Review the payment module")
         assert tool.initial_request == "Review the payment module"
 
 
-class TestDualReviewSchema:
-    """Test schema generation for DualReview tool."""
+class TestSecondThoughtsSchema:
+    """Test schema generation for SecondThoughts tool."""
 
     def test_schema_has_review_type_enum(self):
         """Test review_type field has proper enum values."""
-        tool = DualReviewTool()
+        tool = SecondThoughtsTool()
         schema = tool.get_input_schema()
 
         review_type = schema["properties"]["review_type"]
@@ -395,7 +395,7 @@ class TestDualReviewSchema:
 
     def test_schema_has_severity_filter_enum(self):
         """Test severity_filter field has proper enum values."""
-        tool = DualReviewTool()
+        tool = SecondThoughtsTool()
         schema = tool.get_input_schema()
 
         severity = schema["properties"]["severity_filter"]
@@ -403,15 +403,15 @@ class TestDualReviewSchema:
         assert set(severity["enum"]) == {"critical", "high", "medium", "low", "all"}
 
     def test_schema_excludes_model_field(self):
-        """Test that model field is excluded since dualreview picks its own."""
-        tool = DualReviewTool()
+        """Test that model field is excluded since secondthoughts picks its own."""
+        tool = SecondThoughtsTool()
         schema = tool.get_input_schema()
 
         assert "model" not in schema["properties"]
 
     def test_annotations_read_only(self):
         """Test that tool annotations mark it as read-only."""
-        tool = DualReviewTool()
+        tool = SecondThoughtsTool()
         annotations = tool.get_annotations()
 
         assert annotations is not None
