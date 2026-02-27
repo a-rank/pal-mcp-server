@@ -1,17 +1,18 @@
 """
-Second Thoughts tool - Parallel code review from OpenAI and Gemini simultaneously
+Second Thoughts tool - Get independent expert feedback from OpenAI and Gemini simultaneously
 
-This tool provides a structured code review workflow that automatically sends code
-to both OpenAI and Gemini providers for independent review, then presents both
-perspectives side-by-side. It eliminates the need to manually request opinions
-from multiple models.
+This tool provides a structured workflow that automatically sends your request to
+both OpenAI and Gemini providers for independent expert feedback, then presents both
+perspectives side-by-side. Works for code reviews, implementation plan feedback,
+architecture assessments, and technical decision evaluation.
 
 Key features:
-- Step-by-step code review workflow (like codereview)
-- Automatic parallel review from both OpenAI and Gemini on completion
+- Step-by-step investigation workflow
+- Automatic parallel feedback from both OpenAI and Gemini on completion
 - Independent, blinded reviews (neither model sees the other's output)
-- Side-by-side presentation of both reviews
+- Side-by-side presentation of both expert opinions
 - Falls back gracefully if only one provider is available
+- Flexible modes: code review, plan evaluation, architecture, security, performance
 """
 
 from __future__ import annotations
@@ -40,27 +41,34 @@ logger = logging.getLogger(__name__)
 # Tool-specific field descriptions
 SECONDTHOUGHTS_FIELD_DESCRIPTIONS = {
     "step": (
-        "Review narrative. Step 1: outline the review strategy and initial findings. "
-        "Step 2: report deeper findings. The tool sends code to both OpenAI and Gemini "
-        "when the review completes. Reference code via `relevant_files`; avoid dumping large snippets."
+        "Your analysis narrative. Step 1: outline what you're asking about and initial observations. "
+        "Step 2: report deeper findings. The tool sends everything to both OpenAI and Gemini "
+        "when the workflow completes. Use `relevant_files` for code; put plans/ideas in `findings`."
     ),
-    "step_number": "Current review step (starts at 1). Each step should build on the last.",
+    "step_number": "Current step (starts at 1). Each step should build on the last.",
     "total_steps": (
-        "Number of review steps planned. Default: 2 steps (investigation + summary). "
-        "Use the same limits when continuing an existing review via continuation_id."
+        "Number of steps planned. Default: 2 steps (investigation + summary). "
+        "Use the same limits when continuing an existing workflow via continuation_id."
     ),
     "next_step_required": (
-        "True when another review step follows. Step 1 -> True, final step -> False. "
-        "When False, the tool triggers parallel review from both OpenAI and Gemini."
+        "True when another step follows. Step 1 -> True, final step -> False. "
+        "When False, the tool sends everything to both OpenAI and Gemini for independent feedback."
     ),
-    "findings": "Capture findings (positive and negative) across quality, security, performance, and architecture.",
-    "files_checked": "Absolute paths of every file reviewed, including those ruled out.",
-    "relevant_files": "Step 1: list all files/dirs under review. Must be absolute full non-abbreviated paths.",
-    "relevant_context": "Functions or methods central to findings (e.g. 'Class.method' or 'function_name').",
-    "issues_found": "Issues with severity (critical/high/medium/low) and descriptions.",
-    "images": "Optional diagram or screenshot paths that clarify review context.",
-    "review_type": "Review focus: full, security, performance, or quick.",
-    "focus_on": "Optional note on areas to emphasise (e.g. 'threading', 'auth flow').",
+    "findings": (
+        "Your observations, the plan/proposal being evaluated, or context for the question. "
+        "For plan reviews, include the full plan here. For code reviews, summarize findings."
+    ),
+    "files_checked": "Absolute paths of every file examined, including those ruled out.",
+    "relevant_files": "Files/dirs relevant to the request. Must be absolute full non-abbreviated paths. Optional for plan/architecture mode.",
+    "relevant_context": "Functions, methods, or components central to the discussion (e.g. 'Class.method' or 'auth subsystem').",
+    "issues_found": "Issues or concerns with severity (critical/high/medium/low) and descriptions.",
+    "images": "Optional diagram or screenshot paths that clarify context.",
+    "mode": (
+        "What kind of feedback you want: 'review' (code review), 'plan' (implementation plan feedback), "
+        "'architecture' (design/architecture assessment), 'security' (security-focused), "
+        "'performance' (performance-focused), or 'general' (open-ended expert opinion)."
+    ),
+    "focus_on": "Optional note on areas to emphasise (e.g. 'threading', 'auth flow', 'migration risk', 'scalability').",
     "severity_filter": "Lowest severity to include when reporting issues (critical/high/medium/low/all).",
 }
 
@@ -95,9 +103,9 @@ class SecondThoughtsRequest(WorkflowRequest):
     # Optional images
     images: list[str] | None = Field(default=None, description=SECONDTHOUGHTS_FIELD_DESCRIPTIONS["images"])
 
-    # Review-specific fields (used in step 1)
-    review_type: Literal["full", "security", "performance", "quick"] | None = Field(
-        "full", description=SECONDTHOUGHTS_FIELD_DESCRIPTIONS["review_type"]
+    # Mode and focus fields (used in step 1)
+    mode: Literal["review", "plan", "architecture", "security", "performance", "general"] | None = Field(
+        "review", description=SECONDTHOUGHTS_FIELD_DESCRIPTIONS["mode"]
     )
     focus_on: str | None = Field(None, description=SECONDTHOUGHTS_FIELD_DESCRIPTIONS["focus_on"])
     severity_filter: Literal["critical", "high", "medium", "low", "all"] | None = Field(
@@ -113,20 +121,23 @@ class SecondThoughtsRequest(WorkflowRequest):
 
     @model_validator(mode="after")
     def validate_step_one_requirements(self):
-        """Ensure step 1 has required relevant_files field."""
-        if self.step_number == 1 and not self.relevant_files:
-            raise ValueError("Step 1 requires 'relevant_files' field to specify code files or directories to review")
+        """Ensure step 1 has either relevant_files or substantive findings."""
+        if self.step_number == 1 and not self.relevant_files and not self.findings:
+            raise ValueError(
+                "Step 1 requires either 'relevant_files' (for code) or 'findings' "
+                "(for plans/proposals) to give the experts something to review"
+            )
         return self
 
 
 class SecondThoughtsTool(WorkflowTool):
     """
-    Second Thoughts tool for parallel code review from OpenAI and Gemini.
+    Second Thoughts — get independent expert feedback from OpenAI and Gemini simultaneously.
 
-    This tool implements a structured code review workflow where the CLI agent
-    investigates code through systematic steps, then automatically sends the
-    code and findings to both OpenAI and Gemini for independent expert review.
-    Both reviews are returned side-by-side.
+    Works for code reviews, implementation plan feedback, architecture assessments,
+    and general technical decision evaluation. The CLI agent investigates through
+    structured steps, then automatically sends the context to both providers for
+    independent expert feedback. Both opinions are returned side-by-side.
     """
 
     def __init__(self):
@@ -139,10 +150,11 @@ class SecondThoughtsTool(WorkflowTool):
 
     def get_description(self) -> str:
         return (
-            "Get a second opinion — parallel code review from both OpenAI and Gemini simultaneously. "
-            "Use when you want independent expert opinions from multiple AI providers "
-            "without specifying models manually. Guides through structured investigation, "
-            "then sends code to both providers for independent review."
+            "Get a second opinion from both OpenAI and Gemini simultaneously. "
+            "Use for code reviews, implementation plan feedback, architecture assessments, "
+            "or any technical question where you want independent expert opinions from "
+            "multiple AI providers. Guides through structured investigation, then sends "
+            "context to both providers for independent feedback."
         )
 
     def get_system_prompt(self) -> str:
@@ -221,11 +233,11 @@ class SecondThoughtsTool(WorkflowTool):
                 "items": {"type": "string"},
                 "description": SECONDTHOUGHTS_FIELD_DESCRIPTIONS["images"],
             },
-            "review_type": {
+            "mode": {
                 "type": "string",
-                "enum": ["full", "security", "performance", "quick"],
-                "default": "full",
-                "description": SECONDTHOUGHTS_FIELD_DESCRIPTIONS["review_type"],
+                "enum": ["review", "plan", "architecture", "security", "performance", "general"],
+                "default": "review",
+                "description": SECONDTHOUGHTS_FIELD_DESCRIPTIONS["mode"],
             },
             "focus_on": {
                 "type": "string",
@@ -264,40 +276,60 @@ class SecondThoughtsTool(WorkflowTool):
     def get_required_actions(
         self, step_number: int, confidence: str, findings: str, total_steps: int, request=None
     ) -> list[str]:
-        """Define required actions for each review phase."""
+        """Define required actions for each investigation phase."""
         if request:
             continuation_id = self.get_request_continuation_id(request)
             if continuation_id:
                 if step_number == 1:
                     return [
-                        "Quickly review the code files to understand context",
-                        "Identify any critical issues that need immediate attention",
-                        "Prepare summary of key findings for dual-provider review",
+                        "Quickly review the provided context to understand what feedback is needed",
+                        "Identify any critical concerns that need immediate attention",
+                        "Prepare summary of key observations for dual-provider feedback",
                     ]
                 else:
-                    return ["Complete review and proceed to dual-provider analysis"]
+                    return ["Complete investigation and proceed to dual-provider analysis"]
 
-        if step_number == 1:
-            return [
-                "Read and understand the code files specified for review",
-                "Examine the overall structure, architecture, and design patterns used",
-                "Identify the main components, classes, and functions in the codebase",
-                "Look for obvious issues: bugs, security concerns, performance problems",
-                "Note any code smells, anti-patterns, or areas of concern",
-            ]
-        elif step_number >= 2:
-            return [
-                "Examine specific code sections you've identified as concerning",
-                "Analyze security implications: input validation, authentication, authorization",
-                "Check for performance issues: algorithmic complexity, resource usage",
-                "Look for architectural problems: tight coupling, missing abstractions",
-                "Identify code quality issues: readability, maintainability, error handling",
-            ]
+        mode = getattr(request, "mode", "review") if request else "review"
+
+        if mode in ("plan", "architecture", "general"):
+            if step_number == 1:
+                return [
+                    "Understand the proposal, plan, or question being presented",
+                    "Identify the stated goals, constraints, and assumptions",
+                    "Note any gaps, risks, or unstated assumptions",
+                    "Consider alternative approaches or simplifications",
+                    "If files are referenced, read them to understand the existing codebase context",
+                ]
+            else:
+                return [
+                    "Evaluate feasibility and complexity of the proposed approach",
+                    "Assess trade-offs: complexity vs. value, short-term vs. long-term",
+                    "Check for missing considerations: error handling, migration, rollback, edge cases",
+                    "Consider operational concerns: monitoring, debugging, maintenance burden",
+                ]
         else:
-            return [
-                "Continue examining the codebase for additional patterns and potential issues",
-                "Focus on areas that haven't been thoroughly examined yet",
-            ]
+            # Code review / security / performance modes
+            if step_number == 1:
+                return [
+                    "Read and understand the code files specified for review",
+                    "Examine the overall structure, architecture, and design patterns used",
+                    "Identify the main components, classes, and functions in the codebase",
+                    "Look for obvious issues: bugs, security concerns, performance problems",
+                    "Note any code smells, anti-patterns, or areas of concern",
+                ]
+            elif step_number >= 2:
+                return [
+                    "Examine specific code sections you've identified as concerning",
+                    "Analyze security implications: input validation, authentication, authorization",
+                    "Check for performance issues: algorithmic complexity, resource usage",
+                    "Look for architectural problems: tight coupling, missing abstractions",
+                    "Identify code quality issues: readability, maintainability, error handling",
+                ]
+            else:
+                return [
+                    "Continue examining the codebase for additional patterns and potential issues",
+                    "Focus on areas that haven't been thoroughly examined yet",
+                ]
 
     def should_call_expert_analysis(self, consolidated_findings, request=None) -> bool:
         """SecondThoughts handles its own model calls — skip standard expert analysis."""
@@ -346,7 +378,7 @@ class SecondThoughtsTool(WorkflowTool):
             self.initial_request = request.step
             self.review_config = {
                 "relevant_files": request.relevant_files,
-                "review_type": request.review_type,
+                "mode": request.mode,
                 "focus_on": request.focus_on,
                 "severity_filter": request.severity_filter,
             }
@@ -398,8 +430,8 @@ class SecondThoughtsTool(WorkflowTool):
                 "issues_found": len(self.consolidated_findings.issues_found),
             },
             "next_steps": (
-                "MANDATORY: DO NOT call secondthoughts again immediately. You MUST first examine "
-                "the code files thoroughly. REQUIRED ACTIONS:\n"
+                "MANDATORY: DO NOT call secondthoughts again immediately. You MUST first "
+                "investigate the context thoroughly. REQUIRED ACTIONS:\n"
                 + "\n".join(f"{i + 1}. {action}" for i, action in enumerate(required_actions))
                 + f"\n\nOnly call secondthoughts again AFTER completing your investigation. "
                 f"Use step_number: {request.step_number + 1} and report specific findings."
@@ -411,22 +443,32 @@ class SecondThoughtsTool(WorkflowTool):
         }
 
     def _build_review_prompt(self, request) -> str:
-        """Build the review prompt sent to both providers."""
+        """Build the prompt sent to both providers."""
         parts = []
 
-        # Review request context
-        parts.append(f"=== CODE REVIEW REQUEST ===\n{self.initial_request or request.step}\n=== END REQUEST ===")
+        # Request context
+        mode = getattr(request, "mode", "review") or "review"
+        mode_labels = {
+            "review": "CODE REVIEW",
+            "plan": "IMPLEMENTATION PLAN REVIEW",
+            "architecture": "ARCHITECTURE ASSESSMENT",
+            "security": "SECURITY REVIEW",
+            "performance": "PERFORMANCE REVIEW",
+            "general": "EXPERT FEEDBACK",
+        }
+        label = mode_labels.get(mode, "EXPERT FEEDBACK")
+        parts.append(f"=== {label} REQUEST ===\n{self.initial_request or request.step}\n=== END REQUEST ===")
 
-        # Review configuration
+        # Configuration
         config_parts = []
-        if request.review_type:
-            config_parts.append(f"- Review type: {request.review_type}")
+        if mode:
+            config_parts.append(f"- Mode: {mode}")
         if request.focus_on:
             config_parts.append(f"- Focus areas: {request.focus_on}")
         if request.severity_filter:
             config_parts.append(f"- Severity filter: {request.severity_filter}")
         if config_parts:
-            parts.append("\n=== REVIEW CONFIGURATION ===\n" + "\n".join(config_parts) + "\n=== END CONFIGURATION ===")
+            parts.append("\n=== CONFIGURATION ===\n" + "\n".join(config_parts) + "\n=== END CONFIGURATION ===")
 
         # Investigation summary
         summary = self._build_investigation_summary()
@@ -529,7 +571,7 @@ class SecondThoughtsTool(WorkflowTool):
         return reviews
 
     async def _call_single_provider(self, config: dict, review_prompt: str, request) -> dict:
-        """Call a single provider for code review."""
+        """Call a single provider for expert feedback."""
         from utils.model_context import ModelContext
 
         provider = config["provider"]
@@ -544,11 +586,11 @@ class SecondThoughtsTool(WorkflowTool):
             file_content, _ = self._prepare_file_content_for_prompt(
                 request.relevant_files,
                 None,  # Blinded — no conversation history
-                "Code files for review",
+                "Relevant files",
                 model_context=model_context,
             )
             if file_content:
-                prompt = f"{prompt}\n\n=== CODE FILES ===\n{file_content}\n=== END CODE FILES ==="
+                prompt = f"{prompt}\n\n=== RELEVANT FILES ===\n{file_content}\n=== END RELEVANT FILES ==="
 
         system_prompt = self.get_system_prompt()
 
@@ -604,13 +646,12 @@ class SecondThoughtsTool(WorkflowTool):
                 "issues_found_by_agent": self.consolidated_findings.issues_found,
             },
             "next_steps": (
-                "SECOND THOUGHTS REVIEW IS COMPLETE. You MUST now:\n"
-                "1. Present BOTH reviews side-by-side to the user\n"
-                "2. Highlight where both reviewers AGREE (high-confidence issues)\n"
+                "SECOND THOUGHTS IS COMPLETE. You MUST now:\n"
+                "1. Present BOTH expert opinions side-by-side to the user\n"
+                "2. Highlight where both experts AGREE (high-confidence findings)\n"
                 "3. Highlight where they DISAGREE (needs user judgment)\n"
-                "4. Synthesize a unified priority list of issues\n"
-                "5. Provide concrete, actionable recommendations\n"
-                "6. Categorize all issues by severity (Critical > High > Medium > Low)"
+                "4. Synthesize a unified priority list of recommendations\n"
+                "5. Provide concrete, actionable next steps"
             ),
             "metadata": {
                 "tool_name": self.get_name(),
@@ -648,16 +689,15 @@ class SecondThoughtsTool(WorkflowTool):
             return None
 
     def customize_workflow_response(self, response_data: dict, request) -> dict:
-        """Customize response for dual review workflow."""
+        """Customize response for second thoughts workflow."""
         if request.step_number == 1:
             self.initial_request = request.step
-            if request.relevant_files:
-                self.review_config = {
-                    "relevant_files": request.relevant_files,
-                    "review_type": request.review_type,
-                    "focus_on": request.focus_on,
-                    "severity_filter": request.severity_filter,
-                }
+            self.review_config = {
+                "relevant_files": request.relevant_files,
+                "mode": request.mode,
+                "focus_on": request.focus_on,
+                "severity_filter": request.severity_filter,
+            }
         return response_data
 
     # Required abstract methods from BaseTool

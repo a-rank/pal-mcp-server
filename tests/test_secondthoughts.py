@@ -38,20 +38,35 @@ class TestSecondThoughtsTool:
 
         assert request.step_number == 1
         assert len(request.relevant_files) == 2
-        assert request.review_type == "full"
+        assert request.mode == "review"
         assert request.severity_filter == "all"
 
-    def test_request_validation_missing_files_step1(self):
-        """Test that step 1 requires relevant_files field."""
-        with pytest.raises(ValueError, match="Step 1 requires 'relevant_files'"):
+    def test_request_validation_missing_context_step1(self):
+        """Test that step 1 requires either relevant_files or findings."""
+        with pytest.raises(ValueError, match="Step 1 requires either"):
             SecondThoughtsRequest(
                 step="Test step",
                 step_number=1,
                 total_steps=2,
                 next_step_required=True,
-                findings="Test findings",
-                # Missing relevant_files
+                findings="",  # Empty findings
+                # No relevant_files either
             )
+
+    def test_request_validation_plan_mode_no_files(self):
+        """Test that plan mode works without files (findings only)."""
+        request = SecondThoughtsRequest(
+            step="Evaluate our migration plan",
+            step_number=1,
+            total_steps=2,
+            next_step_required=True,
+            findings="We plan to migrate from PostgreSQL to DynamoDB for the user table",
+            mode="plan",
+        )
+
+        assert request.mode == "plan"
+        assert request.relevant_files == []
+        assert "migrate" in request.findings
 
     def test_request_validation_later_steps(self):
         """Test request validation for steps 2+."""
@@ -67,8 +82,8 @@ class TestSecondThoughtsTool:
         assert request.step_number == 2
         assert request.next_step_required is False
 
-    def test_request_with_review_options(self):
-        """Test request with all review-specific options."""
+    def test_request_with_mode_options(self):
+        """Test request with all mode-specific options."""
         request = SecondThoughtsRequest(
             step="Security-focused review",
             step_number=1,
@@ -76,14 +91,42 @@ class TestSecondThoughtsTool:
             next_step_required=True,
             findings="Initial assessment",
             relevant_files=["/src/api.py"],
-            review_type="security",
+            mode="security",
             focus_on="authentication and authorization",
             severity_filter="high",
         )
 
-        assert request.review_type == "security"
+        assert request.mode == "security"
         assert request.focus_on == "authentication and authorization"
         assert request.severity_filter == "high"
+
+    def test_request_architecture_mode(self):
+        """Test architecture mode request."""
+        request = SecondThoughtsRequest(
+            step="Assess our microservices architecture",
+            step_number=1,
+            total_steps=2,
+            next_step_required=True,
+            findings="We have 12 microservices communicating via REST. Considering switching to event-driven.",
+            mode="architecture",
+            focus_on="scalability and coupling",
+        )
+
+        assert request.mode == "architecture"
+        assert request.focus_on == "scalability and coupling"
+
+    def test_request_general_mode(self):
+        """Test general feedback mode."""
+        request = SecondThoughtsRequest(
+            step="Should we use GraphQL or REST for our new API?",
+            step_number=1,
+            total_steps=2,
+            next_step_required=True,
+            findings="Our API has ~50 endpoints, mostly CRUD. Mobile clients need flexible queries.",
+            mode="general",
+        )
+
+        assert request.mode == "general"
 
     def test_input_schema_generation(self):
         """Test that input schema is generated correctly."""
@@ -101,8 +144,8 @@ class TestSecondThoughtsTool:
         assert "relevant_context" in schema["properties"]
         assert "issues_found" in schema["properties"]
 
-        # Review-specific fields should be present
-        assert "review_type" in schema["properties"]
+        # Mode and option fields should be present
+        assert "mode" in schema["properties"]
         assert "focus_on" in schema["properties"]
         assert "severity_filter" in schema["properties"]
         assert "images" in schema["properties"]
@@ -114,14 +157,25 @@ class TestSecondThoughtsTool:
         assert "hypothesis" not in schema["properties"]
         assert "confidence" not in schema["properties"]
 
-    def test_get_required_actions_step1(self):
-        """Test required actions for step 1."""
+    def test_get_required_actions_step1_review_mode(self):
+        """Test required actions for step 1 in review mode."""
         tool = SecondThoughtsTool()
 
         actions = tool.get_required_actions(1, "low", "", 2)
         assert len(actions) >= 3
         assert any("Read and understand" in a for a in actions)
         assert any("structure" in a.lower() or "architecture" in a.lower() for a in actions)
+
+    def test_get_required_actions_step1_plan_mode(self):
+        """Test required actions for step 1 in plan mode."""
+        tool = SecondThoughtsTool()
+        mock_request = Mock()
+        mock_request.mode = "plan"
+
+        with patch.object(tool, "get_request_continuation_id", return_value=None):
+            actions = tool.get_required_actions(1, "low", "", 2, mock_request)
+            assert any("proposal" in a.lower() or "plan" in a.lower() for a in actions)
+            assert any("gaps" in a.lower() or "risks" in a.lower() for a in actions)
 
     def test_get_required_actions_step2(self):
         """Test required actions for step 2."""
@@ -186,17 +240,61 @@ class TestSecondThoughtsTool:
 
         request = Mock()
         request.step = "Final step"
-        request.review_type = "security"
+        request.mode = "security"
         request.focus_on = "auth flow"
         request.severity_filter = "all"
 
         prompt = tool._build_review_prompt(request)
 
         assert "Review the authentication module" in prompt
-        assert "security" in prompt
+        assert "security" in prompt.lower()
         assert "auth flow" in prompt
         assert "Missing input validation" in prompt
         assert "AuthService.login" in prompt
+
+    def test_build_review_prompt_plan_mode(self):
+        """Test prompt construction for plan mode."""
+        tool = SecondThoughtsTool()
+        tool.initial_request = "Evaluate our migration plan from monolith to microservices"
+        tool.consolidated_findings = Mock()
+        tool.consolidated_findings.findings = ["Step 1: Analyzed migration approach"]
+        tool.consolidated_findings.files_checked = set()
+        tool.consolidated_findings.relevant_files = set()
+        tool.consolidated_findings.relevant_context = set()
+        tool.consolidated_findings.issues_found = []
+
+        request = Mock()
+        request.step = "Final assessment"
+        request.mode = "plan"
+        request.focus_on = "migration risk"
+        request.severity_filter = "all"
+
+        prompt = tool._build_review_prompt(request)
+
+        assert "IMPLEMENTATION PLAN REVIEW" in prompt
+        assert "migration plan" in prompt
+        assert "migration risk" in prompt
+
+    def test_build_review_prompt_architecture_mode(self):
+        """Test prompt construction for architecture mode."""
+        tool = SecondThoughtsTool()
+        tool.initial_request = "Assess our event-driven architecture"
+        tool.consolidated_findings = Mock()
+        tool.consolidated_findings.findings = []
+        tool.consolidated_findings.files_checked = set()
+        tool.consolidated_findings.relevant_files = set()
+        tool.consolidated_findings.relevant_context = set()
+        tool.consolidated_findings.issues_found = []
+
+        request = Mock()
+        request.step = "Final assessment"
+        request.mode = "architecture"
+        request.focus_on = None
+        request.severity_filter = "all"
+
+        prompt = tool._build_review_prompt(request)
+
+        assert "ARCHITECTURE ASSESSMENT" in prompt
 
     def test_build_investigation_summary(self):
         """Test investigation summary construction."""
@@ -370,9 +468,9 @@ class TestSecondThoughtsTool:
         assert result["status"] == "success"
         # Verify generate_content was called with prompt containing file content
         call_args = mock_provider.generate_content.call_args
-        assert "CODE FILES" in call_args.kwargs.get("prompt", call_args[1].get("prompt", "")) or "CODE FILES" in str(
-            call_args
-        )
+        assert "RELEVANT FILES" in call_args.kwargs.get(
+            "prompt", call_args[1].get("prompt", "")
+        ) or "RELEVANT FILES" in str(call_args)
 
     def test_store_initial_issue(self):
         """Test initial issue storage."""
@@ -384,14 +482,14 @@ class TestSecondThoughtsTool:
 class TestSecondThoughtsSchema:
     """Test schema generation for SecondThoughts tool."""
 
-    def test_schema_has_review_type_enum(self):
-        """Test review_type field has proper enum values."""
+    def test_schema_has_mode_enum(self):
+        """Test mode field has proper enum values."""
         tool = SecondThoughtsTool()
         schema = tool.get_input_schema()
 
-        review_type = schema["properties"]["review_type"]
-        assert review_type["type"] == "string"
-        assert set(review_type["enum"]) == {"full", "security", "performance", "quick"}
+        mode = schema["properties"]["mode"]
+        assert mode["type"] == "string"
+        assert set(mode["enum"]) == {"review", "plan", "architecture", "security", "performance", "general"}
 
     def test_schema_has_severity_filter_enum(self):
         """Test severity_filter field has proper enum values."""
