@@ -504,13 +504,17 @@ class SecondThoughtsTool(WorkflowTool):
 
         return "\n".join(summary_parts)
 
+    # Locked models for each provider — always use latest flagship reasoning models
+    LOCKED_MODELS = {
+        "openai": "gpt-5.2-codex",
+        "google": "gemini-3.1-pro-preview",
+    }
+
     async def _call_both_providers(self, review_prompt: str, request) -> list[dict]:
         """Call both OpenAI and Gemini in parallel for independent code review."""
         from providers.registry import ModelProviderRegistry
         from providers.shared.provider_type import ProviderType
-        from tools.models import ToolModelCategory
 
-        # Resolve best model for each provider
         provider_configs = []
 
         for provider_type in [ProviderType.OPENAI, ProviderType.GOOGLE]:
@@ -519,21 +523,16 @@ class SecondThoughtsTool(WorkflowTool):
                 logger.info(f"[SECONDTHOUGHTS] Provider {provider_type.value} not available, skipping")
                 continue
 
-            # Get provider's preferred model for code review
-            allowed_models = ModelProviderRegistry._get_allowed_models_for_provider(provider, provider_type)
-            if not allowed_models:
-                logger.info(f"[SECONDTHOUGHTS] No allowed models for {provider_type.value}, skipping")
+            locked_model = self.LOCKED_MODELS.get(provider_type.value)
+            if not locked_model:
+                logger.info(f"[SECONDTHOUGHTS] No locked model for {provider_type.value}, skipping")
                 continue
-
-            preferred_model = provider.get_preferred_model(ToolModelCategory.EXTENDED_REASONING, list(allowed_models))
-            if not preferred_model:
-                preferred_model = sorted(allowed_models)[0]
 
             provider_configs.append(
                 {
                     "provider": provider,
                     "provider_type": provider_type,
-                    "model_name": preferred_model,
+                    "model_name": locked_model,
                 }
             )
 
