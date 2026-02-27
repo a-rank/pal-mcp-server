@@ -61,6 +61,7 @@ class TestSupportedModelsAliases:
         assert "gpt4.1" in provider.MODEL_CAPABILITIES["gpt-4.1"].aliases
         assert "gpt5.2" in provider.MODEL_CAPABILITIES["gpt-5.2"].aliases
         assert "gpt5.1-codex" in provider.MODEL_CAPABILITIES["gpt-5.1-codex"].aliases
+        assert "codex" in provider.MODEL_CAPABILITIES["gpt-5.2-codex"].aliases
         assert "codex-mini" in provider.MODEL_CAPABILITIES["gpt-5.1-codex-mini"].aliases
 
         # Test alias resolution
@@ -72,6 +73,7 @@ class TestSupportedModelsAliases:
         assert provider._resolve_model_name("gpt5.2") == "gpt-5.2"
         assert provider._resolve_model_name("gpt5.1") == "gpt-5.2"
         assert provider._resolve_model_name("gpt5.1-codex") == "gpt-5.1-codex"
+        assert provider._resolve_model_name("codex") == "gpt-5.2-codex"  # codex -> gpt-5.2-codex now
         assert provider._resolve_model_name("codex-mini") == "gpt-5.1-codex-mini"
 
         # Test case insensitive resolution
