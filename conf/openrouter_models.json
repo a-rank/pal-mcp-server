@@ -103,12 +103,13 @@
       "intelligence_score": 8
     },
     {
-      "model_name": "google/gemini-3-pro-preview",
+      "model_name": "google/gemini-3.1-pro-preview",
       "aliases": [
         "pro",
         "gemini-pro",
         "gemini",
-        "gemini3",
+        "gemini-pro-latest",
+        "gemini3.1",
         "pro-openrouter"
       ],
       "context_window": 1048576,
@@ -119,7 +120,24 @@
       "supports_images": true,
       "max_image_size_mb": 20.0,
       "allow_code_generation": true,
-      "description": "Google's Gemini 3.0 Pro via OpenRouter with vision",
+      "description": "Google's Gemini 3.1 Pro via OpenRouter with vision",
+      "intelligence_score": 18
+    },
+    {
+      "model_name": "google/gemini-3-pro-preview",
+      "aliases": [
+        "gemini3",
+        "gemini3.0"
+      ],
+      "context_window": 1048576,
+      "max_output_tokens": 65536,
+      "supports_extended_thinking": true,
+      "supports_json_mode": true,
+      "supports_function_calling": true,
+      "supports_images": true,
+      "max_image_size_mb": 20.0,
+      "allow_code_generation": true,
+      "description": "Deprecated: discontinuing March 9, 2026. Google's Gemini 3.0 Pro via OpenRouter - Use gemini-3.1-pro-preview instead",
       "intelligence_score": 18
     },
     {
