@@ -355,7 +355,7 @@
         "gpt5.4pro",
         "gpt-5.4-pro",
         "gpt5pro",
-        "pro"
+        "gpt5-pro"
       ],
       "context_window": 1000000,
       "max_output_tokens": 272000,
