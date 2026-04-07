@@ -89,7 +89,7 @@ class TestOpenAIProvider:
         assert provider._resolve_model_name("gpt5.2") == "gpt-5.2"
         assert provider._resolve_model_name("gpt5.1") == "gpt-5.2"
         assert provider._resolve_model_name("gpt5.1-codex") == "gpt-5.1-codex"
-        assert provider._resolve_model_name("codex") == "gpt-5.2-codex"
+        assert provider._resolve_model_name("codex") == "gpt-5.3-codex"
         assert provider._resolve_model_name("codex-mini") == "gpt-5.1-codex-mini"
 
         # Test full name passthrough
