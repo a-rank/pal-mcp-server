@@ -98,8 +98,7 @@ class TestModelSelection:
             ModelProviderRegistry.register_provider(ProviderType.OPENAI, OpenAIModelProvider)
 
             model = ModelProviderRegistry.get_preferred_fallback_model(ToolModelCategory.EXTENDED_REASONING)
-            # OpenAI prefers latest Codex for extended reasoning (coding tasks)
-            assert model == "gpt-5.3-codex"
+            assert model == "gpt-5.5"
 
     def test_extended_reasoning_with_gemini_only(self):
         """Test EXTENDED_REASONING prefers pro when only Gemini is available."""
@@ -117,7 +116,7 @@ class TestModelSelection:
             model = ModelProviderRegistry.get_preferred_fallback_model(ToolModelCategory.EXTENDED_REASONING)
             # Gemini should return one of its models for extended reasoning
             # The default behavior may return flash when pro is not explicitly preferred
-            assert model in ["gemini-3.1-pro-preview", "gemini-3-pro-preview", "gemini-2.5-flash", "gemini-2.0-flash"]
+            assert model in ["gemini-3.1-pro-preview", "gemini-3-pro-preview", "gemini-3-flash-preview", "gemini-2.5-flash", "gemini-2.0-flash"]
 
     def test_fast_response_with_openai(self):
         """Test FAST_RESPONSE with OpenAI provider."""
@@ -133,8 +132,7 @@ class TestModelSelection:
             ModelProviderRegistry.register_provider(ProviderType.OPENAI, OpenAIModelProvider)
 
             model = ModelProviderRegistry.get_preferred_fallback_model(ToolModelCategory.FAST_RESPONSE)
-            # OpenAI now prefers gpt-5.2 for fast response (based on our new preference order)
-            assert model == "gpt-5.2"
+            assert model == "gpt-5.4-mini"
 
     def test_fast_response_with_gemini_only(self):
         """Test FAST_RESPONSE prefers flash when only Gemini is available."""
@@ -150,8 +148,7 @@ class TestModelSelection:
             ModelProviderRegistry.register_provider(ProviderType.GOOGLE, GeminiModelProvider)
 
             model = ModelProviderRegistry.get_preferred_fallback_model(ToolModelCategory.FAST_RESPONSE)
-            # Gemini should return one of its models for fast response
-            assert model in ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.5-pro"]
+            assert model in ["gemini-3.1-flash-lite-preview", "gemini-3-flash-preview", "gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.5-pro"]
 
     def test_balanced_category_fallback(self):
         """Test BALANCED category uses existing logic."""
@@ -167,8 +164,7 @@ class TestModelSelection:
             ModelProviderRegistry.register_provider(ProviderType.OPENAI, OpenAIModelProvider)
 
             model = ModelProviderRegistry.get_preferred_fallback_model(ToolModelCategory.BALANCED)
-            # OpenAI prefers gpt-5.2 for balanced (based on our new preference order)
-            assert model == "gpt-5.2"
+            assert model == "gpt-5.5"
 
     def test_no_category_uses_balanced_logic(self):
         """Test that no category specified uses balanced logic."""
@@ -179,8 +175,7 @@ class TestModelSelection:
             ModelProviderRegistry.register_provider(ProviderType.GOOGLE, GeminiModelProvider)
 
             model = ModelProviderRegistry.get_preferred_fallback_model()
-            # Should pick flash for balanced use
-            assert model == "gemini-2.5-flash"
+            assert model in ["gemini-3.1-flash-lite-preview", "gemini-3-flash-preview", "gemini-2.5-flash"]
 
 
 class TestFlexibleModelSelection:
@@ -195,21 +190,21 @@ class TestFlexibleModelSelection:
                 "env": {"OPENAI_API_KEY": "test-key"},
                 "provider_type": ProviderType.OPENAI,
                 "category": ToolModelCategory.EXTENDED_REASONING,
-                "expected": "gpt-5.3-codex",  # GPT-5.3-Codex prioritized for coding tasks
+                "expected": "gpt-5.5",
             },
             # Case 2: Gemini provider for fast response
             {
                 "env": {"GEMINI_API_KEY": "test-key"},
                 "provider_type": ProviderType.GOOGLE,
                 "category": ToolModelCategory.FAST_RESPONSE,
-                "expected": "gemini-2.5-flash",
+                "expected": "gemini-3.1-flash-lite-preview",
             },
             # Case 3: OpenAI provider for fast response
             {
                 "env": {"OPENAI_API_KEY": "test-key"},
                 "provider_type": ProviderType.OPENAI,
                 "category": ToolModelCategory.FAST_RESPONSE,
-                "expected": "gpt-5.2",  # Based on new preference order
+                "expected": "gpt-5.4-mini",
             },
         ]
 

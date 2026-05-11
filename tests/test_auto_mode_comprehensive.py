@@ -80,9 +80,9 @@ class TestAutoModeComprehensive:
                     "OPENROUTER_API_KEY": None,
                 },
                 {
-                    "EXTENDED_REASONING": "gemini-3.1-pro-preview",  # Gemini 3.1 Pro Preview for deep thinking
-                    "FAST_RESPONSE": "gemini-2.5-flash",  # Flash for speed
-                    "BALANCED": "gemini-2.5-flash",  # Flash as balanced
+                    "EXTENDED_REASONING": "gemini-3.1-pro-preview",
+                    "FAST_RESPONSE": "gemini-3.1-flash-lite-preview",
+                    "BALANCED": "gemini-3.1-flash-lite-preview",
                 },
             ),
             # Only OpenAI API available
@@ -94,9 +94,9 @@ class TestAutoModeComprehensive:
                     "OPENROUTER_API_KEY": None,
                 },
                 {
-                    "EXTENDED_REASONING": "gpt-5.3-codex",  # GPT-5.3 Codex prioritized for coding tasks
-                    "FAST_RESPONSE": "gpt-5.2",  # Prefer gpt-5.2 for speed
-                    "BALANCED": "gpt-5.2",  # Prefer gpt-5.2 for balanced
+                    "EXTENDED_REASONING": "gpt-5.5",
+                    "FAST_RESPONSE": "gpt-5.4-mini",
+                    "BALANCED": "gpt-5.5",
                 },
             ),
             # Only X.AI API available
@@ -123,8 +123,8 @@ class TestAutoModeComprehensive:
                 },
                 {
                     "EXTENDED_REASONING": "gemini-3.1-pro-preview",  # Gemini 3.1 Pro Preview comes first in priority
-                    "FAST_RESPONSE": "gemini-2.5-flash",  # Prefer flash for speed
-                    "BALANCED": "gemini-2.5-flash",  # Prefer flash for balanced
+                    "FAST_RESPONSE": "gemini-3.1-flash-lite-preview",
+                    "BALANCED": "gemini-3.1-flash-lite-preview",
                 },
             ),
             # All native APIs available - Google still comes first
@@ -137,8 +137,8 @@ class TestAutoModeComprehensive:
                 },
                 {
                     "EXTENDED_REASONING": "gemini-3.1-pro-preview",  # Gemini 3.1 Pro Preview comes first in priority
-                    "FAST_RESPONSE": "gemini-2.5-flash",  # Prefer flash for speed
-                    "BALANCED": "gemini-2.5-flash",  # Prefer flash for balanced
+                    "FAST_RESPONSE": "gemini-3.1-flash-lite-preview",
+                    "BALANCED": "gemini-3.1-flash-lite-preview",
                 },
             ),
         ],
@@ -527,10 +527,9 @@ class TestAutoModeComprehensive:
             mock_provider = MagicMock()
             mock_response = MagicMock()
             mock_response.content = "test response"
-            mock_response.model_name = "gemini-2.5-flash"  # The resolved name
+            mock_response.model_name = "gemini-3-flash-preview"  # The resolved name
             mock_response.usage = {"input_tokens": 10, "output_tokens": 5}
-            # Mock _resolve_model_name to simulate alias resolution
-            mock_provider._resolve_model_name = lambda alias: ("gemini-2.5-flash" if alias == "flash" else alias)
+            mock_provider._resolve_model_name = lambda alias: ("gemini-3-flash-preview" if alias == "flash" else alias)
             mock_provider.generate_content.return_value = mock_response
 
             with patch.object(ModelProviderRegistry, "get_provider_for_model", return_value=mock_provider):

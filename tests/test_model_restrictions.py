@@ -99,7 +99,7 @@ class TestModelRestrictionService:
 
             # Google should only allow flash (and its resolved name)
             assert service.is_allowed(ProviderType.GOOGLE, "flash")
-            assert service.is_allowed(ProviderType.GOOGLE, "gemini-2.5-flash", "flash")
+            assert service.is_allowed(ProviderType.GOOGLE, "gemini-3-flash-preview", "flash")
             assert not service.is_allowed(ProviderType.GOOGLE, "pro")
             assert not service.is_allowed(ProviderType.GOOGLE, "gemini-2.5-pro", "pro")
 
@@ -143,7 +143,7 @@ class TestModelRestrictionService:
             assert not service.is_allowed(ProviderType.OPENAI, "o3")
 
             # Google should allow both models via shorthands
-            assert service.is_allowed(ProviderType.GOOGLE, "gemini-2.5-flash", "flash")
+            assert service.is_allowed(ProviderType.GOOGLE, "gemini-3-flash-preview", "flash")
             assert service.is_allowed(ProviderType.GOOGLE, "gemini-2.5-pro", "pro")
 
             # Also test that full names work when specified in restrictions
@@ -257,7 +257,7 @@ class TestProviderIntegration:
             provider.get_capabilities("o3")
         assert "not allowed by restriction policy" in str(exc_info.value)
 
-    @patch.dict(os.environ, {"GOOGLE_ALLOWED_MODELS": "gemini-2.5-flash,flash"})
+    @patch.dict(os.environ, {"GOOGLE_ALLOWED_MODELS": "gemini-3-flash-preview,flash"})
     def test_gemini_provider_respects_restrictions(self):
         """Test that Gemini provider respects restrictions."""
         # Clear any cached restriction service
@@ -269,7 +269,7 @@ class TestProviderIntegration:
 
         # Should validate allowed models (both shorthand and full name allowed)
         assert provider.validate_model_name("flash")
-        assert provider.validate_model_name("gemini-2.5-flash")
+        assert provider.validate_model_name("gemini-3-flash-preview")
 
         # Should not validate disallowed model
         assert not provider.validate_model_name("pro")
@@ -311,15 +311,15 @@ class TestProviderIntegration:
 
             # Should allow getting capabilities for "flash"
             capabilities = provider.get_capabilities("flash")
-            assert capabilities.model_name == "gemini-2.5-flash"
+            assert capabilities.model_name == "gemini-3-flash-preview"
 
             # Canonical form should also be allowed now that alias is on the allowlist
-            assert provider.validate_model_name("gemini-2.5-flash")
+            assert provider.validate_model_name("gemini-3-flash-preview")
             # Unrelated models remain blocked
             assert not provider.validate_model_name("pro")
             assert not provider.validate_model_name("gemini-2.5-pro")
 
-    @patch.dict(os.environ, {"GOOGLE_ALLOWED_MODELS": "gemini-2.5-flash"})
+    @patch.dict(os.environ, {"GOOGLE_ALLOWED_MODELS": "gemini-3-flash-preview"})
     def test_gemini_parameter_order_edge_case_full_name_only(self):
         """Test parameter order with only full name allowed, not alias.
 
@@ -335,7 +335,7 @@ class TestProviderIntegration:
         provider = GeminiModelProvider(api_key="test-key")
 
         # Should allow full name
-        assert provider.validate_model_name("gemini-2.5-flash")
+        assert provider.validate_model_name("gemini-3-flash-preview")
 
         # Should also allow alias that resolves to allowed full name
         # This works because is_allowed checks both resolved_name and original_name
@@ -608,13 +608,13 @@ class TestShorthandRestrictions:
 
         with patch.object(ModelProviderRegistry, "get_provider", side_effect=registry_side_effect):
             assert openai_provider.validate_model_name("mini")  # Should work with shorthand
-            assert openai_provider.validate_model_name("gpt-5-mini")  # Canonical resolved from shorthand
+            assert openai_provider.validate_model_name("gpt-5.4-mini")  # Canonical resolved from shorthand
             assert not openai_provider.validate_model_name("o4-mini")  # Unrelated model still blocked
             assert not openai_provider.validate_model_name("o3-mini")
 
             # Test Gemini provider
             assert gemini_provider.validate_model_name("flash")  # Should work with shorthand
-            assert gemini_provider.validate_model_name("gemini-2.5-flash")  # Canonical allowed
+            assert gemini_provider.validate_model_name("gemini-3-flash-preview")  # Canonical allowed
             assert not gemini_provider.validate_model_name("pro")  # Not allowed
 
     @patch.dict(os.environ, {"OPENAI_ALLOWED_MODELS": "o3mini,mini,o4-mini"})
@@ -641,7 +641,7 @@ class TestShorthandRestrictions:
 
     @patch.dict(
         os.environ,
-        {"OPENAI_ALLOWED_MODELS": "mini,o4-mini", "GOOGLE_ALLOWED_MODELS": "flash,gemini-2.5-flash"},
+        {"OPENAI_ALLOWED_MODELS": "mini,o4-mini", "GOOGLE_ALLOWED_MODELS": "flash,gemini-3-flash-preview"},
     )
     def test_both_shorthand_and_full_name_allowed(self):
         """Test that we can allow both shorthand and full names."""
@@ -658,7 +658,7 @@ class TestShorthandRestrictions:
         # Gemini - both flash and full name are allowed
         gemini_provider = GeminiModelProvider(api_key="test-key")
         assert gemini_provider.validate_model_name("flash")
-        assert gemini_provider.validate_model_name("gemini-2.5-flash")
+        assert gemini_provider.validate_model_name("gemini-3-flash-preview")
 
 
 class TestAutoModeWithRestrictions:
@@ -778,8 +778,7 @@ class TestAutoModeWithRestrictions:
 
             # The fallback will depend on how get_available_models handles aliases
             # When "mini" is allowed, it's returned as the allowed model
-            # "mini" is now an alias for gpt-5-mini, but the list shows "mini" itself
-            assert model in ["mini", "gpt-5-mini", "o4-mini", "gemini-2.5-flash"]
+            assert model in ["mini", "gpt-5.4-mini", "gpt-5-mini", "o4-mini", "gemini-3.1-flash-lite-preview", "gemini-3-flash-preview", "gemini-2.5-flash"]
         finally:
             # Restore original registry state
             registry = ModelProviderRegistry()

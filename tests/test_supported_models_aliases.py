@@ -19,27 +19,27 @@ class TestSupportedModelsAliases:
             assert isinstance(config.aliases, list), f"{model_name} aliases must be a list"
 
         # Test specific aliases
-        assert "flash" in provider.MODEL_CAPABILITIES["gemini-2.5-flash"].aliases
+        assert "flash" in provider.MODEL_CAPABILITIES["gemini-3-flash-preview"].aliases
         assert "pro" in provider.MODEL_CAPABILITIES["gemini-3.1-pro-preview"].aliases
         assert "gemini-pro-latest" in provider.MODEL_CAPABILITIES["gemini-3.1-pro-preview"].aliases
         assert "flash-2.0" in provider.MODEL_CAPABILITIES["gemini-2.0-flash"].aliases
         assert "flash2" in provider.MODEL_CAPABILITIES["gemini-2.0-flash"].aliases
-        assert "flashlite" in provider.MODEL_CAPABILITIES["gemini-2.0-flash-lite"].aliases
-        assert "flash-lite" in provider.MODEL_CAPABILITIES["gemini-2.0-flash-lite"].aliases
+        assert "flashlite" in provider.MODEL_CAPABILITIES["gemini-3.1-flash-lite-preview"].aliases
+        assert "flash-lite" in provider.MODEL_CAPABILITIES["gemini-3.1-flash-lite-preview"].aliases
 
         # Test alias resolution
-        assert provider._resolve_model_name("flash") == "gemini-2.5-flash"
+        assert provider._resolve_model_name("flash") == "gemini-3-flash-preview"
         assert provider._resolve_model_name("pro") == "gemini-3.1-pro-preview"
         assert provider._resolve_model_name("gemini-pro-latest") == "gemini-3.1-pro-preview"
         assert provider._resolve_model_name("flash-2.0") == "gemini-2.0-flash"
         assert provider._resolve_model_name("flash2") == "gemini-2.0-flash"
-        assert provider._resolve_model_name("flashlite") == "gemini-2.0-flash-lite"
+        assert provider._resolve_model_name("flashlite") == "gemini-3.1-flash-lite-preview"
         # gemini-3-pro-preview still resolves to itself
         assert provider._resolve_model_name("gemini-3-pro-preview") == "gemini-3-pro-preview"
         assert provider._resolve_model_name("gemini3") == "gemini-3-pro-preview"
 
         # Test case insensitive resolution
-        assert provider._resolve_model_name("Flash") == "gemini-2.5-flash"
+        assert provider._resolve_model_name("Flash") == "gemini-3-flash-preview"
         assert provider._resolve_model_name("PRO") == "gemini-3.1-pro-preview"
 
     def test_openai_provider_aliases(self):
@@ -52,8 +52,8 @@ class TestSupportedModelsAliases:
             assert isinstance(config.aliases, list), f"{model_name} aliases must be a list"
 
         # Test specific aliases
-        # "mini" is now an alias for gpt-5-mini, not o4-mini
-        assert "mini" in provider.MODEL_CAPABILITIES["gpt-5-mini"].aliases
+        # "mini" is now an alias for gpt-5.4-mini
+        assert "mini" in provider.MODEL_CAPABILITIES["gpt-5.4-mini"].aliases
         assert "o4mini" in provider.MODEL_CAPABILITIES["o4-mini"].aliases
         # o4-mini is no longer in its own aliases (removed self-reference)
         assert "o3mini" in provider.MODEL_CAPABILITIES["o3-mini"].aliases
@@ -65,7 +65,7 @@ class TestSupportedModelsAliases:
         assert "codex-mini" in provider.MODEL_CAPABILITIES["gpt-5.1-codex-mini"].aliases
 
         # Test alias resolution
-        assert provider._resolve_model_name("mini") == "gpt-5-mini"  # mini -> gpt-5-mini now
+        assert provider._resolve_model_name("mini") == "gpt-5.4-mini"  # mini -> gpt-5.4-mini now
         assert provider._resolve_model_name("o3mini") == "o3-mini"
         assert provider._resolve_model_name("o3pro") == "o3-pro"  # o3pro resolves to o3-pro
         assert provider._resolve_model_name("o4mini") == "o4-mini"
@@ -77,7 +77,7 @@ class TestSupportedModelsAliases:
         assert provider._resolve_model_name("codex-mini") == "gpt-5.1-codex-mini"
 
         # Test case insensitive resolution
-        assert provider._resolve_model_name("Mini") == "gpt-5-mini"  # mini -> gpt-5-mini now
+        assert provider._resolve_model_name("Mini") == "gpt-5.4-mini"  # mini -> gpt-5.4-mini now
         assert provider._resolve_model_name("O3MINI") == "o3-mini"
         assert provider._resolve_model_name("Gpt5.1") == "gpt-5.2"
 
