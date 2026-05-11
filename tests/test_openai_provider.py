@@ -79,7 +79,7 @@ class TestOpenAIProvider:
         provider = OpenAIModelProvider("test-key")
 
         # Test shorthand resolution
-        assert provider._resolve_model_name("mini") == "gpt-5-mini"  # "mini" now resolves to gpt-5-mini
+        assert provider._resolve_model_name("mini") == "gpt-5.4-mini"  # "mini" now resolves to gpt-5.4-mini
         assert provider._resolve_model_name("o3mini") == "o3-mini"
         assert provider._resolve_model_name("o4mini") == "o4-mini"
         assert provider._resolve_model_name("o4mini") == "o4-mini"
@@ -127,8 +127,8 @@ class TestOpenAIProvider:
         provider = OpenAIModelProvider("test-key")
 
         capabilities = provider.get_capabilities("mini")
-        assert capabilities.model_name == "gpt-5-mini"  # "mini" now resolves to gpt-5-mini
-        assert capabilities.friendly_name == "OpenAI (GPT-5-mini)"
+        assert capabilities.model_name == "gpt-5.4-mini"  # "mini" now resolves to gpt-5.4-mini
+        assert capabilities.friendly_name == "OpenAI (GPT-5.4 mini)"
         assert capabilities.context_window == 400_000
         assert capabilities.provider == ProviderType.OPENAI
 
